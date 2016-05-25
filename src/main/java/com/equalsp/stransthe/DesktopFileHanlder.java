@@ -8,12 +8,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 public class DesktopFileHanlder implements CachedServiceFileHander {	
-	private static final String PATH = "src/main/resources/cachedInthegraService.json";
 
 	@Override
 	public String loadCacheFile() throws IOException {
 		String fileContent = "";
-		Path path = Paths.get(PATH);
+		Path path = Paths.get(FILE_NAME);
 		if (Files.exists(path, LinkOption.NOFOLLOW_LINKS) ){
 			fileContent = new String(Files.readAllBytes(path));
 		}
@@ -22,7 +21,7 @@ public class DesktopFileHanlder implements CachedServiceFileHander {
 
 	@Override
 	public void saveCacheFile(String cacheJson) throws IOException {
-		Path path = Paths.get(PATH);
+		Path path = Paths.get(FILE_NAME);
 		Files.deleteIfExists(path);
 		Files.createFile(path);
 		try (BufferedWriter writer = Files.newBufferedWriter(path)) {
