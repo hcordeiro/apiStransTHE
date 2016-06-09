@@ -14,7 +14,8 @@ public class Testes {
 	public static void main(String[] args) throws Exception {
 		InthegraAPI service = new InthegraService("aa91935448534d519da1cda34d0b1ee4", "c2387331@trbvn.com", "c2387331@trbvn.com");
 		DesktopFileHanlder fileHanlder = new DesktopFileHanlder();
-		CachedInthegraService cachedService = new CachedInthegraService(service, fileHanlder, 1, TimeUnit.DAYS);
+//		CachedInthegraService cachedService = new CachedInthegraService(service, fileHanlder, 1, TimeUnit.DAYS);
+		CachedInthegraService cachedService = new CachedInthegraService(service, fileHanlder);
 
 		RotaService rotasService = new RotaService(cachedService);
 		PontoDeInteresse casa = new PontoDeInteresse(-5.069581, -42.759898);

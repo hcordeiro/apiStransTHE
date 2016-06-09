@@ -17,16 +17,29 @@ import com.google.gson.JsonObject;
 public class CachedInthegraService implements InthegraAPI {
 
 	private static final int ITEM_NOT_FOUND = 130;
-
+	
 	private final InthegraAPI delegate;
-	protected CachedServiceFileHander fileHandler;
+	
+	protected final CachedServiceFileHander fileHandler;
 	protected final long timeoutInMillis;
 	protected final ReentrantLock lock = new ReentrantLock();
+	
 	protected long expireAt = 0;
-
 	protected Map<Linha, List<Parada>> cacheLinhaParadas = new HashMap<>();
 	protected Map<Parada, List<Linha>> cacheParadaLinhas = new HashMap<>();
 
+	public CachedInthegraService(InthegraAPI delegate, CachedServiceFileHander fileHandler) {
+		if (delegate == null) {
+			throw new IllegalArgumentException("delegate não pode ser null");
+		}
+		if (fileHandler == null) {
+			throw new IllegalArgumentException("fileHandler não pode ser null");
+		}
+		this.delegate = delegate;
+		this.fileHandler = fileHandler;
+		this.timeoutInMillis = 0;
+	}
+	
 	public CachedInthegraService(InthegraAPI delegate, CachedServiceFileHander fileHandler, long tempoExpiracao, TimeUnit unit) {
 		if (delegate == null) {
 			throw new IllegalArgumentException("delegate não pode ser null");
@@ -34,7 +47,6 @@ public class CachedInthegraService implements InthegraAPI {
 		if (fileHandler == null) {
 			throw new IllegalArgumentException("fileHandler não pode ser null");
 		}
-		this.fileHandler = fileHandler;
 		this.delegate = delegate;
 		this.fileHandler = fileHandler;
 		this.timeoutInMillis = unit.toMillis(tempoExpiracao);
@@ -45,42 +57,18 @@ public class CachedInthegraService implements InthegraAPI {
 		if (System.currentTimeMillis() > expireAt) {
 			lock.lock();
 			try {
-				expireAt = System.currentTimeMillis() + timeoutInMillis;
-				boolean successfullyLoaded = loadCacheFromFile();
+				boolean successfullyLoaded = loadFromFile();
 				if (!successfullyLoaded) {
 					refreshCache();
-					saveCacheToFile(expireAt, cacheLinhaParadas, cacheParadaLinhas);
+					if (timeoutInMillis != 0) {
+						expireAt = System.currentTimeMillis() + timeoutInMillis;
+					} else {
+						expireAt = Long.MAX_VALUE;
+					}
+					saveToFile();
 				}
 			} finally {
 				lock.unlock();
-			}
-		}
-	}
-
-	protected void refreshCache() throws IOException {
-		cacheLinhaParadas.clear();
-		cacheParadaLinhas.clear();
-
-		List<Linha> linhas = delegate.getLinhas();
-		List<Parada> paradas;
-		for (Linha linha : linhas) {
-			try {
-				paradas = delegate.getParadas(linha);
-				cacheLinhaParadas.put(linha, paradas);
-
-				for (Parada parada : paradas) {
-					List<Linha> linhasDaParada = cacheParadaLinhas.get(parada);
-					if (linhasDaParada == null) {
-						linhasDaParada = new ArrayList<>();
-						cacheParadaLinhas.put(parada, linhasDaParada);
-					}
-					linhasDaParada.add(linha);
-				}
-
-			} catch (InthegraException e) {
-				if (e.getErro().getCode() != ITEM_NOT_FOUND) {
-					throw e;
-				}
 			}
 		}
 	}
@@ -141,15 +129,90 @@ public class CachedInthegraService implements InthegraAPI {
 		return delegate.getVeiculos(linha);
 	}
 	
+	protected void refreshCache() throws IOException {
+		cacheLinhaParadas.clear();
+		cacheParadaLinhas.clear();
 
-	private boolean loadCacheFromFile() throws IOException {
+		List<Linha> linhas = delegate.getLinhas();
+		List<Parada> paradas;
+		for (Linha linha : linhas) {
+			try {
+				paradas = delegate.getParadas(linha);
+				cacheLinhaParadas.put(linha, paradas);
+
+				for (Parada parada : paradas) {
+					List<Linha> linhasDaParada = cacheParadaLinhas.get(parada);
+					if (linhasDaParada == null) {
+						linhasDaParada = new ArrayList<>();
+						cacheParadaLinhas.put(parada, linhasDaParada);
+					}
+					linhasDaParada.add(linha);
+				}
+
+			} catch (InthegraException e) {
+				if (e.getErro().getCode() != ITEM_NOT_FOUND) {
+					throw e;
+				}
+			}
+		}
+	}
+	
+	private void saveToFile() throws IOException {
+		Gson gson = new GsonBuilder().create();
+		JsonObject cachedJsonObject = new JsonObject();
+		
+		cachedJsonObject.addProperty("expireAt", gson.toJson(expireAt));
+		
+		JsonArray linhasParadasJsonArray = new JsonArray();
+		for (Linha linha : cacheLinhaParadas.keySet()) {
+			JsonObject linhaParadaJsonObject = new JsonObject();
+			String linhaJson = gson.toJson(linha);
+			
+			List<Parada> paradas = cacheLinhaParadas.get(linha);
+			JsonArray paradasJsonArray = new JsonArray();
+			for (Parada parada : paradas) {
+				String paradaJson = gson.toJson(parada);
+				paradasJsonArray.add(paradaJson);
+			}
+			linhaParadaJsonObject.addProperty("linha", linhaJson);
+			linhaParadaJsonObject.add("paradas", paradasJsonArray);
+			
+			linhasParadasJsonArray.add(linhaParadaJsonObject);
+		}
+		cachedJsonObject.add("linhasParadas", linhasParadasJsonArray);
+		//cachedJsonObject.add("linhasParadas", gson.toJsonTree(cacheLinhaParadas));
+		
+		JsonArray paradasLinhasJsonArray = new JsonArray();
+		for (Parada parada : cacheParadaLinhas.keySet()) {
+			JsonObject paradaLinhasJsonObject = new JsonObject();
+			String paradaJson = gson.toJson(parada);
+			
+			List<Linha> linhas = cacheParadaLinhas.get(parada);
+			JsonArray linhasJsonArray = new JsonArray();
+			for (Linha linha : linhas) {
+				String linhaJson = gson.toJson(linha);
+				linhasJsonArray.add(linhaJson);
+			}
+			paradaLinhasJsonObject.addProperty("parada", paradaJson);
+			paradaLinhasJsonObject.add("linhas", linhasJsonArray);
+			
+			paradasLinhasJsonArray.add(paradaLinhasJsonObject);
+		}
+		cachedJsonObject.add("paradasLinhas", paradasLinhasJsonArray);
+		//cachedJsonObject.add("paradasLinhas", gson.toJsonTree(cacheParadaLinhas));
+
+		String cacheJson = gson.toJson(cachedJsonObject);
+		fileHandler.saveCacheFile(cacheJson);
+	}
+	
+	protected boolean loadFromFile() throws IOException {
 		String fileContent = fileHandler.loadCacheFile();
 		if (!fileContent.isEmpty()) {
 			Gson gson = new GsonBuilder().create();
 			JsonObject cacheJson = gson.fromJson(fileContent, JsonObject.class);
-			long expire = cacheJson.get("expireAt").getAsLong();
+			expireAt = cacheJson.get("expireAt").getAsLong();
 			
-			if (System.currentTimeMillis() > expire) {
+			if (System.currentTimeMillis() > expireAt) {
 				return false;
 			} else {
 				cacheLinhaParadas.clear();
@@ -188,56 +251,8 @@ public class CachedInthegraService implements InthegraAPI {
 				}
 				return true;
 			}
-		} else {
-			return false;
 		}
-	}
-
-	private void saveCacheToFile(Long expireAt, Map<Linha, List<Parada>> cacheLinhaParadas, Map<Parada, List<Linha>> cacheParadaLinhas) throws IOException {
-		Gson gson = new GsonBuilder().create();
-		JsonObject cachedJsonObject = new JsonObject();
-		
-		cachedJsonObject.addProperty("expireAt", gson.toJson(expireAt));
-		
-		JsonArray linhasParadasJsonArray = new JsonArray();
-		for (Linha linha : cacheLinhaParadas.keySet()) {
-			JsonObject linhaParadaJsonObject = new JsonObject();
-			String linhaJson = gson.toJson(linha);
-			
-			List<Parada> paradas = cacheLinhaParadas.get(linha);
-			JsonArray paradasJsonArray = new JsonArray();
-			for (Parada parada : paradas) {
-				String paradaJson = gson.toJson(parada);
-				paradasJsonArray.add(paradaJson);
-			}
-			linhaParadaJsonObject.addProperty("linha", linhaJson);
-			linhaParadaJsonObject.add("paradas", paradasJsonArray);
-			
-			linhasParadasJsonArray.add(linhaParadaJsonObject);
-		}
-		cachedJsonObject.add("linhasParadas", linhasParadasJsonArray);
-		
-		JsonArray paradasLinhasJsonArray = new JsonArray();
-		for (Parada parada : cacheParadaLinhas.keySet()) {
-			JsonObject paradaLinhasJsonObject = new JsonObject();
-			String paradaJson = gson.toJson(parada);
-			
-			List<Linha> linhas = cacheParadaLinhas.get(parada);
-			JsonArray linhasJsonArray = new JsonArray();
-			for (Linha linha : linhas) {
-				String linhaJson = gson.toJson(linha);
-				linhasJsonArray.add(linhaJson);
-			}
-			paradaLinhasJsonObject.addProperty("parada", paradaJson);
-			paradaLinhasJsonObject.add("linhas", linhasJsonArray);
-			
-			paradasLinhasJsonArray.add(paradaLinhasJsonObject);
-		}
-		cachedJsonObject.add("paradasLinhas", paradasLinhasJsonArray);
-
-		String cacheJson = gson.toJson(cachedJsonObject);
-		
-		fileHandler.saveCacheFile(cacheJson);
+		return false;
 	}
 
 }
