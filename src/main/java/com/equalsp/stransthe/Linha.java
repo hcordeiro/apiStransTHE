@@ -1,6 +1,9 @@
 package com.equalsp.stransthe;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 public class Linha implements Serializable {
 
@@ -72,7 +75,37 @@ public class Linha implements Serializable {
 	
 	@Override
 	public String toString() {
-		return getCodigoLinha() + " - " + getDenomicao();
+		return getCodigoLinha() + " - " + toTitleCase(getDenomicao());
+	}
+	
+	private static final List<String> lowerCaseWords = new ArrayList<>(Arrays.asList(new String[]{"VIA", "DE", "DA"}));
+	private static final List<String> upperCaseWords = new ArrayList<>(Arrays.asList(new String[]{"XXIII", "II", "I.A.P.C", "HD"}));
+	
+	private String toTitleCase(String string) {
+		StringBuilder sb = new StringBuilder();
+		String[] words = string.replace(" - ", "-").replace("-", " - ").replace(" / ", "/").replace("/", " / ").split(" ");
+		
+		for (int i = 0; i < words.length; i++) {
+			if (words[i].length() > 0) {
+				if (words[i].equals(".") || words[i].equals("/")) {
+					sb.append(words[i]);
+				} else {
+					if (i > 0) {
+						if (!words[i-1].equals("/")) {
+							sb.append(" ");
+						}
+					}
+					if (upperCaseWords.contains(words[i])) {
+						sb.append(words[i]);
+					} else if (lowerCaseWords.contains(words[i])) {
+						sb.append(words[i].toLowerCase());
+					} else  {
+						sb.append(Character.toUpperCase(words[i].charAt(0)) + words[i].subSequence(1, words[i].length()).toString().toLowerCase());
+					}
+				}
+			}
+		}
+		return sb.toString();
 	}
 
 }

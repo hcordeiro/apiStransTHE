@@ -11,6 +11,7 @@ import com.equalsp.stransthe.CachedInthegraService;
 import com.equalsp.stransthe.Linha;
 import com.equalsp.stransthe.Localizacao;
 import com.equalsp.stransthe.Parada;
+import com.equalsp.stransthe.Veiculo;
 
 /**
  * 
@@ -31,6 +32,28 @@ public class RotaService {
 	public RotaService(CachedInthegraService cachedService) {
 		super();
 		this.cachedService = cachedService;
+	}
+	
+	public int paradasAte(Linha linha, Veiculo veiculo, Parada destino) throws IOException {
+		PontoDeInteresse posicaoVeiculo = new PontoDeInteresse(veiculo.getLat(), veiculo.getLong());
+		Parada origem = getParadasProximas(posicaoVeiculo, 1000, 1).get(0);
+		List<Parada> paradasLinha = getParadas(linha);
+		
+		boolean passouOrigem = false;
+		int counter = 0;
+		for (Parada parada : paradasLinha) {
+			if (parada.equals(origem)) {
+				passouOrigem = true;
+			} else if (passouOrigem) {
+				counter++;
+			}
+			
+			if (passouOrigem && parada.equals(destino)) {
+				break;
+			}
+		}
+
+		return counter;
 	}
 
 	public Set<Rota> getRotas(PontoDeInteresse a, PontoDeInteresse b, double distanciaPe) throws IOException {
@@ -57,7 +80,7 @@ public class RotaService {
 		for (Parada origem : origens) {
 			List<Linha> linhasOrigem = getLinhas(origem);
 			for (Linha linha : linhasOrigem) {
-				Parada destino = LinhaPassaApos(linha, origem, destinos);
+				Parada destino = linhaPassaApos(linha, origem, destinos);
 				if (destino != null) {
 					Rota rota = new Rota();
 					List<Parada> proximasParadas = ParadasDaLinhaAteDestino(linha, origem, destinos);
@@ -104,7 +127,7 @@ public class RotaService {
 		inicial.setDestino(trechos.get(0).getOrigem());
 
 		Trecho f = new Trecho();
-		f.setOrigem(trechos.get(trechos.size()-1).getOrigem());
+		f.setOrigem(trechos.get(trechos.size()-1).getDestino());
 		f.setDestino(b);
 
 		trechos.add(0, inicial);
@@ -122,7 +145,7 @@ public class RotaService {
 		return r;
 	}
 	
-	private Parada LinhaPassaApos(Linha linha, Parada origem, List<Parada> destinos) throws IOException {
+	private Parada linhaPassaApos(Linha linha, Parada origem, List<Parada> destinos) throws IOException {
 		List<Parada> paradasLinha = getParadas(linha);
 		boolean passouOrigem = false;
 		for (Parada parada : paradasLinha) {
@@ -138,7 +161,7 @@ public class RotaService {
 	
 	private List<Parada> ParadasDaLinhaAteDestino(Linha linha, Parada origem, List<Parada> destinos) throws IOException {
 		List<Parada> paradasLinha = getParadas(linha);
-		List<Parada> proximasParadas = new ArrayList<>();
+		List<Parada> proximasParadas = new ArrayList<Parada>();
 		boolean passouOrigem = false;
 		boolean passouDestino = false;
 		
