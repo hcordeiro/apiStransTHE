@@ -2,9 +2,7 @@ package com.equalsp.stransthe.rotas;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 import com.equalsp.stransthe.Linha;
 
@@ -44,11 +42,14 @@ public class Rota implements Serializable, Comparable<Rota> {
 	@Override
 	public String toString() {
 		StringBuilder builder = new StringBuilder();
-		Set<Linha> linhasDoTrecho = new HashSet<>();
+		List<Linha> linhasDoTrecho = new ArrayList<>();
 		
 		for (Trecho trecho : trechos) {
-			if (trecho.getLinha() != null) {
-				linhasDoTrecho.add(trecho.getLinha());	
+			Linha linha = trecho.getLinha();
+			if (linha != null) {
+				if (!linhasDoTrecho.contains(linha)){
+					linhasDoTrecho.add(linha);	
+				}
 			}
 		}
 		for (Linha linha : linhasDoTrecho) {
@@ -56,6 +57,9 @@ public class Rota implements Serializable, Comparable<Rota> {
 		}
 		builder.delete(builder.lastIndexOf("/")-1, builder.length());
 
+		builder.append(". Trechos: ");
+		builder.append(trechos.size());
+		
 		return builder.toString();
 	}
 }
