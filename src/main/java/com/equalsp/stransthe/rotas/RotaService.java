@@ -40,15 +40,18 @@ public class RotaService {
 	public Set<Rota> getRotas(PontoDeInteresse a, PontoDeInteresse b, double distanciaPe) throws IOException {
 		List<Parada> origens = getParadasProximas(a, distanciaPe, 5);
 		List<Parada> destinos = getParadasProximas(b, distanciaPe, 5);
-		Set<Rota> rotas = getRotas_UnicoOnibus(origens, destinos);
-		if (rotas.isEmpty()) {
-			origens = getParadasProximas(a, distanciaPe, 5);
-			destinos = getParadasProximas(b, distanciaPe, 2);
-			rotas = getRotas_DoisOnibus(origens, destinos, distanciaPe);
-		}
-		
-		for (Rota rota : rotas) {
-			adicionarTrechosPedestre(rota, a, b);
+		Set<Rota> rotas = new TreeSet<>();
+		if (!origens.isEmpty() && !destinos.isEmpty()) {			
+			rotas = getRotas_UnicoOnibus(origens, destinos);
+			if (rotas.isEmpty()) {
+				origens = getParadasProximas(a, distanciaPe, 5);
+				destinos = getParadasProximas(b, distanciaPe, 2);
+				rotas = getRotas_DoisOnibus(origens, destinos, distanciaPe);
+			}
+			
+			for (Rota rota : rotas) {
+				adicionarTrechosPedestre(rota, a, b);
+			}
 		}
 		return rotas;
 	}
@@ -90,15 +93,20 @@ public class RotaService {
 		}
 		
 		Map<Linha, List<Rota>> rotasPorLinha = new HashMap<>();
-        for (Rota r : rotas) {
-            Linha l = r.getTrechos().get(1).getLinha();
-            if (rotasPorLinha.containsKey(l)) {
-                rotasPorLinha.get(l).add(r);
-            } else {
-                List<Rota> rotasDaLinha = new ArrayList<>();
-                rotasDaLinha.add(r);
-                rotasPorLinha.put(l, rotasDaLinha);
-            }
+        for (Rota rota : rotas) {
+        	List<Trecho> trechos = rota.getTrechos();
+        	for (Trecho trecho : trechos) {
+        		Linha linha = trecho.getLinha();
+        		if (linha != null) {        			
+        			if (rotasPorLinha.containsKey(linha)) {
+        				rotasPorLinha.get(linha).add(rota);
+        			} else {
+        				List<Rota> rotasDaLinha = new ArrayList<>();
+        				rotasDaLinha.add(rota);
+        				rotasPorLinha.put(linha, rotasDaLinha);
+        			}
+        		}
+			}
         }
 
 		Set<Rota> rotasList = new TreeSet<Rota>();
@@ -125,7 +133,7 @@ public class RotaService {
 		
 		for (Parada destino : destinos) {
 			linhasQuePassamNoDestino = getLinhas(destino);
-			linhaQuePassaNoDestino: for (Linha linhaQuePassaNoDestino : linhasQuePassamNoDestino) {
+			for (Linha linhaQuePassaNoDestino : linhasQuePassamNoDestino) {
 				primeiraParadadaLinhaQuePassanNoDestino = getParadas(linhaQuePassaNoDestino).get(0);
 				paradasDaLinhaQuePassaNoDestino = paradasDaLinhaAteDestino(linhaQuePassaNoDestino, primeiraParadadaLinhaQuePassanNoDestino, destino);
 				Collections.reverse(paradasDaLinhaQuePassaNoDestino);
@@ -146,13 +154,11 @@ public class RotaService {
 										}
 									}
 								}
-
 								if (linhasQuePassamNaParadaProxima.contains(linhaQuePassaNaOrigem)) {
 									paradasDaLinhaQuePassaNaOrigemAteParadaProxima = paradasDaLinhaAteDestino(linhaQuePassaNaOrigem, origem, paradaProxima);
 									if (paradasDaLinhaQuePassaNaOrigemAteParadaProxima.isEmpty()) {
 										continue origemLoop;
 									}
-
 									Rota rotaNova = new Rota();
 									ultimaParada = origem;
 									for (Parada parada : paradasDaLinhaQuePassaNaOrigemAteParadaProxima) {
@@ -165,7 +171,6 @@ public class RotaService {
 										}
 										ultimaParada = parada;
 									}
-
 									List<Parada> paradasDaLinhaQuePassaNoDestinoAteDestino = paradasDaLinhaAteDestino(
 											linhaQuePassaNoDestino, paradaDaLinhaQuePassaNoDestino, destino);
 									if (!paradasDaLinhaQuePassaNoDestinoAteDestino.isEmpty()) {
@@ -175,7 +180,6 @@ public class RotaService {
 											trechoAPe.setDestino(paradaDaLinhaQuePassaNoDestino);
 											rotaNova.getTrechos().add(trechoAPe);
 										}
-
 										ultimaParada = paradaDaLinhaQuePassaNoDestino;
 										for (Parada parada : paradasDaLinhaQuePassaNoDestinoAteDestino) {
 											if (ultimaParada != parada) {
@@ -187,7 +191,6 @@ public class RotaService {
 											}
 											ultimaParada = parada;
 										}
-
 										// asdasdasdas
 										if (!mapaRotas.containsKey(linhaQuePassaNaOrigem)) {
 											Map<Linha, List<Rota>> rotasDaLinhaDeOrigem = new HashMap<>();
@@ -216,37 +219,10 @@ public class RotaService {
 			}
 		}
 		
-		Map<Linha, Map<Linha, List<Rota>>> rotasPorLinha_todas = new HashMap<>();
-		for (Rota rota : rotas) {
-			List<Linha> linhasPorRota = new ArrayList<>();
-			for (Trecho trecho : rota.getTrechos()) {
-				if (trecho.getLinha() != null) {
-					linhasPorRota.add(trecho.getLinha());
-				}
-			}
-			
-			Linha l1 = linhasPorRota.get(0);
-			Linha l2 = linhasPorRota.get(1);
-			if (rotasPorLinha_todas.containsKey(l1)) {
-				Map<Linha, List<Rota>> rotasPorLinha2 = rotasPorLinha_todas.get(l1);
-				if (rotasPorLinha2.containsKey(l2)) {
-					rotasPorLinha2.get(l2).add(rota);
-				} else {
-					List<Rota> rotasDaLinha = new ArrayList<>();
-					rotasDaLinha.add(rota);
-					rotasPorLinha2.put(l2, rotasDaLinha);
-				}
-            } else {
-                Map<Linha, List<Rota>> rotasPorLinha2 = new HashMap<>();
-                List<Rota> rotasDaLinha = new ArrayList<>();
-                rotasDaLinha.add(rota);
-                rotasPorLinha2.put(l2, rotasDaLinha);
-                rotasPorLinha_todas.put(l1, rotasPorLinha2);
-            }
-		}
+
 		
 		Set<Rota> rotasList = new TreeSet<Rota>();
-		for (Entry<Linha, Map<Linha, List<Rota>>> e1 : rotasPorLinha_todas.entrySet()) {
+		for (Entry<Linha, Map<Linha, List<Rota>>> e1 : mapaRotas.entrySet()) {
 			Map<Linha, List<Rota>> value = e1.getValue();
 			for (Entry<Linha, List<Rota>> e2 : value.entrySet()) {
 				List<Rota> rs = e2.getValue();

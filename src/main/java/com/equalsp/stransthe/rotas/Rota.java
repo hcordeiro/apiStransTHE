@@ -34,14 +34,14 @@ public class Rota implements Serializable, Comparable<Rota> {
 
 	@Override
 	public int compareTo(Rota o) {
-		double diff = getDistanciaTotal() - o.getDistanciaTotal();
-		return (int) diff;
-
+		if (o.getLinhas().equals(getLinhas())) {
+			return ((Integer) trechos.size()).compareTo(o.getTrechos().size());
+		}
+		return 1;
 	}
+	
 
-	@Override
-	public String toString() {
-		StringBuilder builder = new StringBuilder();
+	public List<Linha> getLinhas() {
 		List<Linha> linhasDoTrecho = new ArrayList<>();
 		
 		for (Trecho trecho : trechos) {
@@ -52,14 +52,18 @@ public class Rota implements Serializable, Comparable<Rota> {
 				}
 			}
 		}
-		for (Linha linha : linhasDoTrecho) {
-			builder.append(linha.toString() + " / ");
-		}
-		builder.delete(builder.lastIndexOf("/")-1, builder.length());
+		return linhasDoTrecho;
+	}
 
-		builder.append(". Trechos: ");
-		builder.append(trechos.size());
+	@Override
+	public String toString() {
+		StringBuilder builder = new StringBuilder();
 		
+		for (Linha linha : getLinhas()) {
+			builder.append(linha.toString() + " | ");
+		}
+		builder.delete(builder.lastIndexOf("|")-1, builder.length());
+
 		return builder.toString();
 	}
 }
